@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-func ValidateInput(filePath *string, manPath *string) error {
+func ValidateInput(filePath *string, manPath *string, oldMan *string) error {
 	if *filePath == "" {
 		return custom_errors.FileNotProvide
 	}
 
-	if *manPath == "" {
+	if *manPath == "" || *oldMan == "" {
 		return custom_errors.ManifestNotProvide
 	}
 
@@ -24,13 +24,21 @@ func ValidateInput(filePath *string, manPath *string) error {
 		return custom_errors.ManifestNotFound
 	}
 
+	if _, err := os.Stat(*oldMan); errors.Is(err, os.ErrNotExist) {
+		return custom_errors.ManifestNotFound
+	}
+
 	if !strings.HasSuffix(*filePath, "bin") {
 		return custom_errors.FileFormatError
 	}
 
-	if !strings.HasSuffix(*manPath, "json") && !strings.HasSuffix(*manPath, "rdx") {
-		return custom_errors.ManifestFormatError
-	}
+	//if !strings.HasSuffix(*manPath, "json") && !strings.HasSuffix(*manPath, "rdx") {
+	//	return custom_errors.ManifestFormatError
+	//}
+
+	//if !strings.HasSuffix(*oldMan, "json") && !strings.HasSuffix(*oldMan, "rdx") {
+	//	return custom_errors.ManifestFormatError
+	//}
 
 	return nil
 }

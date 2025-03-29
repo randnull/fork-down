@@ -13,10 +13,11 @@ import (
 func main() {
 	filePath := flag.String("file", "", "path to file")
 	manifestPath := flag.String("manifest", "", "path to manifest")
+	oldManifestPath := flag.String("oldmanifest", "", "path to old manifest")
 
 	flag.Parse()
 
-	err := utils.ValidateInput(filePath, manifestPath)
+	err := utils.ValidateInput(filePath, manifestPath, oldManifestPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,9 +29,7 @@ func main() {
 		return
 	}
 
-	// вот тут мы должны получить манифест для старого файла
-
-	manifestForOld, err := utils.ReadManifest(*manifestPath)
+	manifestForOld, err := utils.ReadManifest(*oldManifestPath)
 
 	fileChunks, err := utils.ToChunks(*filePath, manifestForOld)
 	if err != nil {
