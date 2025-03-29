@@ -1,67 +1,94 @@
 package restore
 
 import (
-	"fork-down/custom_errors"
-	"fork-down/models"
-	"fork-down/repository"
-	"log"
-	"os"
+ "fork-down/custom_errors"
+ "fork-down/models"
+ "fork-down/repository"
+ "log"
+ "os"
+ "sync"
 )
 
 type Restore struct {
-	config     *models.ConfigRestore
-	repository repository.Repository
+ config     *models.ConfigRestore
+ repository repository.Repository
 }
 
 func InitRestore(config *models.ConfigRestore, repo repository.Repository) *Restore {
-	// валидация по-хорошему
+ // валидация по-хорошему
 
-	return &Restore{
-		config:     config,
-		repository: repo,
-	}
+ return &Restore{
+  config:     config,
+  repository: repo,
+ }
 }
 
 func (r *Restore) RestoreFile(fileChunksData map[string][]byte, manifest []models.Chunk) {
-	outputFile, err := os.Create(r.config.SaveFilePath)
+ outputFile, err := os.Create(r.config.SaveFilePath)
 
-	if err != nil {
-		log.Fatal(custom_errors.ErrorOpenFile)
-	}
+ if err != nil {
+  log.Fatal(custom_errors.ErrorOpenFile)
+ }
 
-	var chunksToDownload []models.Chunk
+ var wg sync.WaitGroup
 
-	for _, chunk := range manifest {
-		_, isExist := fileChunksData[chunk.Hash]
+ chunksToDownload := make(chan models.Chunk, len(manifest))
 
-		if !isExist {
-			chunksToDownload = append(chunksToDownload, chunk)
-		} else {
-			log.Printf("chunk %v founded", chunk.Hash)
-		}
-	}
+ for _, chunk := range manifest {
+  _, isExist := fileChunksData[chunk.Hash]
 
-	for _, chunk := range chunksToDownload {
-		downloadChunk, err := r.repository.DownloadChunk(chunk.Hash)
-		log.Printf("chunk %v downloaded", chunk.Hash)
+  if !isExist {
+   chunksToDownload <- chunk
+  } else {
+   log.Printf("chunk %v founded", chunk.Hash)
+  }
+ }
 
-		if err != nil {
-			log.Fatal(custom_errors.ErrorDownloadChunk)
-		}
+ close(chunksToDownload)
 
-		fileChunksData[chunk.Hash] = downloadChunk
-	}
+ var mu sync.Mutex
 
-	for _, chunk := range manifest {
-		chunkData, exists := fileChunksData[chunk.Hash]
+ downloadChunks := make(map[string][]byte)
 
-		if !exists {
-			log.Fatal(custom_errors.FatalError)
-		}
+ worker := func(workerNum int) {
+  defer wg.Done()
 
-		_, err := outputFile.Write(chunkData)
-		if err != nil {
-			log.Fatal(custom_errors.ErrorWriteFile)
-		}
-	}
+  for chunk := range chunksToDownload {
+   downloadChunk, err := r.repository.DownloadChunk(chunk.Hash)
+   if err != nil {
+    log.Fatal(custom_errors.ErrorDownloadChunk)
+   }
+   log.Printf("chunk %v downloaded (%v)", chunk.Hash, workerNum)
+   mu.Lock()
+   downloadChunks[chunk.Hash] = downloadChunk
+   mu.Unlock()
+  }
+ }
+
+ for i := 0; i < 3; i++ {
+  wg.Add(1)
+  go worker(i)
+ }
+
+ wg.Wait()
+
+ for _, chunk := range manifest {
+  var data []byte
+
+  chunkData, exists := fileChunksData[chunk.Hash]
+  if !exists {
+   chunkDataDownloaded, existsDownload := downloadChunks[chunk.Hash]
+   if !existsDownload {
+    log.Fatal(custom_errors.FatalError)
+   }
+   data = chunkDataDownloaded
+  } else {
+   data = chunkData
+  }
+
+  _, err := outputFile.Write(data)
+  if err != nil {
+   log.Fatal(custom_errors.ErrorWriteFile)
+  }
+ }
 }
