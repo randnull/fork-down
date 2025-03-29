@@ -28,7 +28,7 @@ func ValidateInput(filePath *string, manPath *string) error {
 		return custom_errors.FileFormatError
 	}
 
-	if !strings.HasSuffix(*manPath, "json") {
+	if !strings.HasSuffix(*manPath, "json") && !strings.HasSuffix(*manPath, "rdx") {
 		return custom_errors.ManifestFormatError
 	}
 
