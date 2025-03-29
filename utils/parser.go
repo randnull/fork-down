@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"errors"
 	"fork-down/custom_errors"
+	"fork-down/models"
 	"io"
 	"os"
 )
 
-func ToChunks(filePath string) (map[string][]byte, error) {
+func ToChunks(filePath string, manifest []models.Chunk) (map[string][]byte, error) {
 	file, err := os.Open(filePath)
 
 	if err != nil {
@@ -17,38 +18,33 @@ func ToChunks(filePath string) (map[string][]byte, error) {
 
 	defer file.Close()
 
-	chunkSize := 1024 * 64 * 2
-
 	chunks := make(map[string][]byte)
-
-	buffer := make([]byte, chunkSize)
 
 	reader := bufio.NewReader(file)
 
-	for {
-		n, err := io.ReadFull(reader, buffer[:cap(buffer)])
-		buffer = buffer[:n]
+	for _, chunk := range manifest {
+		buffer := make([]byte, chunk.Size)
 
+		chunkData, err := io.ReadFull(reader, buffer)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			if errors.Is(err, io.ErrUnexpectedEOF) {
-				if n > 0 {
-					data := make([]byte, n)
+				if chunkData > 0 {
+					data := make([]byte, chunkData)
 
 					copy(data, buffer)
 
-					hash := Sha256Hash(data)
-
-					chunks[hash] = data
+					buffer = data
 				}
 				break
 			}
 			return nil, custom_errors.ErrorWithReadFile
 		}
 
-		data := make([]byte, n)
+		data := make([]byte, chunkData)
 
 		copy(data, buffer)
 

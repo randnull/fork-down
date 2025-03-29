@@ -28,7 +28,11 @@ func main() {
 		return
 	}
 
-	fileChunks, err := utils.ToChunks(*filePath)
+	// вот тут мы должны получить манифест для старого файла
+
+	manifestForOld, err := utils.ReadManifest(*manifestPath)
+
+	fileChunks, err := utils.ToChunks(*filePath, manifestForOld)
 	if err != nil {
 		return
 	}
