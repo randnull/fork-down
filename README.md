@@ -3,6 +3,8 @@ fork-down given a manifest and an S3 storage URI, downloads a blob chunk by chun
 
 Использование:
 ```
+go mod tidy
+
 go build -o fork-down main.go
 
 ./fork-down -file "test15.bin" -manifest "manifest.json"
